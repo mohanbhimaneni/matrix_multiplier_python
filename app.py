@@ -1,4 +1,3 @@
-#heading
 from kivy.app import App
 from kivy.uix.button import Label
 from kivy.uix.floatlayout import FloatLayout
@@ -40,6 +39,7 @@ class Interface():
         self.error=''
         self.matrix1_inputs = []  # Store TextInput widgets for matrix1
         self.matrix2_inputs = []  # Store TextInput widgets for matrix2
+        self.result_matrix = None  # Store result for display
     def homescreen(self):
         home=FloatLayout()
         InputBox1=BoxLayout(orientation='horizontal',size_hint=(.5,.05),pos_hint={'left':1,'top':1})
@@ -117,51 +117,219 @@ class Interface():
     
     def matrixInputScreen(self):
         self.values=[]
-        self.matrix1_inputs = []  # Reset on each screen creation
-        self.matrix2_inputs = []  # Reset on each screen creation
+        self.matrix1_inputs = []
+        self.matrix2_inputs = []
         s=FloatLayout()
-        head=Label(text="Enter the matrix entries below",size_hint=(1,.08),pos_hint={'top':.98,'left':1})
+        head=Label(
+            text="[b]Enter the matrix entries below[/b]",
+            markup=True,
+            font_size='24sp',
+            size_hint=(1,.12),
+            pos_hint={'center_x':0.5, 'top':1},
+            halign='center',
+            valign='middle'
+        )
+        head.bind(size=lambda instance, value: setattr(instance, 'text_size', value))
         s.add_widget(head)
 
-        # Matrix A input
-        mat1Box=BoxLayout(orientation='horizontal',size_hint=(1,.4),pos_hint={'left':1,'top':.9})
-        mat1Label=Label(text='Matrix A : ',size_hint=(.2,1))
+        # Matrix A input (left aligned)
+        mat1Box=BoxLayout(
+            orientation='horizontal',
+            size_hint=(None, None),
+            width=60+50*self.matrix1.n,
+            height=60+50*self.matrix1.m,
+            pos_hint={'x':0, 'top':.9}
+        )
+        mat1Label=Label(
+            text='Matrix A : ',
+            size_hint=(None,1),
+            width=80,
+            halign='left',
+            valign='middle'
+        )
+        mat1Label.bind(size=lambda instance, value: setattr(instance, 'text_size', value))
         mat1Box.add_widget(mat1Label)
         grid1 = GridLayout(
             rows=self.matrix1.m,
             cols=self.matrix1.n,
-            size_hint=(.8, 1)
+            size_hint=(None, None),
+            width=50*self.matrix1.n,
+            height=50*self.matrix1.m,
+            spacing=5,
+            padding=[0,0,0,0]
         )
         for i in range(self.matrix1.m):
             row_inputs = []
             for j in range(self.matrix1.n):
-                inp = TextInput(multiline=False)
+                inp = TextInput(
+                    multiline=False,
+                    size_hint=(None, None),
+                    width=50,
+                    height=50,
+                    halign='left'
+                )
                 row_inputs.append(inp)
                 grid1.add_widget(inp)
             self.matrix1_inputs.append(row_inputs)
         mat1Box.add_widget(grid1)
         s.add_widget(mat1Box)
 
-        # Matrix B input
-        mat2Box=BoxLayout(orientation='horizontal',size_hint=(1,.4),pos_hint={'left':1,'top':.48})
-        mat2Label=Label(text='Matrix B : ',size_hint=(.2,1))
+        # Matrix B input (left aligned)
+        mat2Box=BoxLayout(
+            orientation='horizontal',
+            size_hint=(None, None),
+            width=60+50*self.matrix2.n,
+            height=60+50*self.matrix2.m,
+            pos_hint={'x':0, 'top':.48}
+        )
+        mat2Label=Label(
+            text='Matrix B : ',
+            size_hint=(None,1),
+            width=80,
+            halign='left',
+            valign='middle'
+        )
+        mat2Label.bind(size=lambda instance, value: setattr(instance, 'text_size', value))
         mat2Box.add_widget(mat2Label)
         grid2 = GridLayout(
             rows=self.matrix2.m,
             cols=self.matrix2.n,
-            size_hint=(.8, 1)
+            size_hint=(None, None),
+            width=50*self.matrix2.n,
+            height=50*self.matrix2.m,
+            spacing=5,
+            padding=[0,0,0,0]
         )
         for i in range(self.matrix2.m):
             row_inputs = []
             for j in range(self.matrix2.n):
-                inp = TextInput(multiline=False)
+                inp = TextInput(
+                    multiline=False,
+                    size_hint=(None, None),
+                    width=50,
+                    height=50,
+                    halign='left'
+                )
                 row_inputs.append(inp)
                 grid2.add_widget(inp)
             self.matrix2_inputs.append(row_inputs)
         mat2Box.add_widget(grid2)
         s.add_widget(mat2Box)
 
+        # Add Multiply button below matrix inputs
+        def multiply_pressed(instance):
+            try:
+                # Get values from input fields
+                values1 = self.get_matrix1_values()
+                values2 = self.get_matrix2_values()
+                # Convert to float and validate
+                mat1_vals = [[float(val) for val in row] for row in values1]
+                mat2_vals = [[float(val) for val in row] for row in values2]
+                self.matrix1.set_values(mat1_vals)
+                self.matrix2.set_values(mat2_vals)
+                # Multiply
+                result = self.matrix1.multiply(self.matrix2)
+                self.result_matrix = result
+                # Show result screen
+                solver_screen = Screen(name='matrix_solver')
+                solver_screen.add_widget(self.matrixSolverScreen())
+                # Remove old solver screen if exists
+                if 'matrix_solver' in [s.name for s in root.screens]:
+                    root.remove_widget(root.get_screen('matrix_solver'))
+                root.add_widget(solver_screen)
+                root.transition = SlideTransition(direction='left', duration=.25)
+                root.current = 'matrix_solver'
+            except Exception as e:
+                # Show error screen if invalid input or multiplication error
+                errorscreen = self.errorscreen(f"Invalid input or multiplication error: {e}")
+                screen = Screen(name='error_screen')
+                screen.add_widget(errorscreen)
+                self.errorwidget = screen
+                root.add_widget(screen)
+                root.transition = SlideTransition(direction='left', duration=.25)
+                root.current = 'error_screen'
+
+        multiply_btn = Button(
+            text='Multiply',
+            size_hint=(.2, .07),
+            pos_hint={'x':0, 'y':.02},
+            on_press=multiply_pressed
+        )
+        s.add_widget(multiply_btn)
+        # Add home button (bottom left)
+        def go_home(instance):
+            root.transition=SlideTransition(direction='right', duration=.25)
+            root.current='home_screen'
+        home_btn = Button(text='Home', size_hint=(.15, .07), pos_hint={'x':.5, 'y':.02}, on_press=go_home)
+        s.add_widget(home_btn)
         return s
+
+    def matrixSolverScreen(self):
+        # Display the result matrix in a grid, similar to input
+        layout = FloatLayout()
+        head = Label(
+            text="[b]Product of Matrix A and Matrix B[/b]",
+            markup=True,
+            font_size='24sp',
+            size_hint=(1,.12),
+            pos_hint={'center_x':0.5, 'top':1},
+            halign='center',
+            valign='middle'
+        )
+        head.bind(size=lambda instance, value: setattr(instance, 'text_size', value))
+        layout.add_widget(head)
+
+        if not self.result_matrix:
+            error_label = Label(
+                text="No result to display.",
+                size_hint=(1, .2),
+                pos_hint={'center_x':0.5, 'center_y':0.5}
+            )
+            layout.add_widget(error_label)
+            return layout
+
+        rows = self.result_matrix.m
+        cols = self.result_matrix.n
+        grid = GridLayout(
+            rows=rows,
+            cols=cols,
+            size_hint=(None, None),
+            width=50*cols,
+            height=50*rows,
+            spacing=5,
+            pos_hint={'x':0, 'top':.8}
+        )
+        for i in range(rows):
+            for j in range(cols):
+                val = str(self.result_matrix.values[i][j])
+                grid.add_widget(Label(
+                    text=val,
+                    size_hint=(None, None),
+                    width=50,
+                    height=50,
+                    halign='center',
+                    valign='middle'
+                ))
+        layout.add_widget(grid)
+
+        # Add a back button
+        def back_pressed(instance):
+            root.transition = SlideTransition(direction='right', duration=.25)
+            root.current = 'input_screen'
+        back_btn = Button(
+            text='Back',
+            size_hint=(.2, .07),
+            pos_hint={'x':0, 'y':.09},
+            on_press=back_pressed
+        )
+        # Add home button (bottom left)
+        def go_home(instance):
+            root.transition=SlideTransition(direction='right', duration=.25)
+            root.current='home_screen'
+        home_btn = Button(text='Home', size_hint=(.15, .07), pos_hint={'x':0, 'y':0}, on_press=go_home)
+        layout.add_widget(back_btn)
+        layout.add_widget(home_btn)
+        return layout
 
     def get_matrix1_values(self):
         # Returns a 2D list of the current values in the matrix1 input fields
@@ -183,7 +351,7 @@ class Matrix:
     def __init__(self,m=1,n=1):
         self.m=m
         self.n=n
-        self.values=[[0 for i in range(self.m)]for j in range(self.n)]
+        self.values=[[0 for i in range(self.n)]for j in range(self.m)]
     def set_values(self,values):
         if len(values)!=self.m:
             raise ValueError('Not right length of rows')
@@ -204,7 +372,18 @@ class Matrix:
             s+='\n'
         return s
     def multiply(self,matrix):
-        pass
+        # Matrix multiplication logic
+        if self.n != matrix.m:
+            raise ValueError("Matrix dimensions do not match for multiplication")
+        result = Matrix(self.m, matrix.n)
+        result.values = [[0 for _ in range(matrix.n)] for _ in range(self.m)]
+        for i in range(self.m):
+            for j in range(matrix.n):
+                sum = 0
+                for k in range(self.n):
+                    sum += self.values[i][k] * matrix.values[k][j]
+                result.values[i][j] = sum
+        return result
             
 
 
